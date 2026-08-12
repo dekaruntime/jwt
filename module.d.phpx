@@ -1,4 +1,33 @@
 import { Result } from 'core/result'
 
+/// docid: phpx/jwt/sign()
+/// <Function name="sign">
+///   <Description>PHPX standard module function `sign` from `jwt`.</Description>
+///   <Parameter name="$payload" type="mixed" required="true" typeLink="/docs/php/types/mixed">
+///     Parameter $payload.
+///   </Parameter>
+///   <Parameter name="$secret" type="mixed" required="true" typeLink="/docs/php/types/mixed">
+///     Parameter $secret.
+///   </Parameter>
+///   <Parameter name="$options" type="mixed" required="false" typeLink="/docs/php/types/mixed">
+///     Parameter $options.
+///   </Parameter>
+///   <ReturnType type="Result<string, string>" />
+/// </Function>
 export function sign($payload: mixed, $secret: mixed, $options: mixed = []): Result<string, string>
+
+/// docid: phpx/jwt/verify()
+/// <Function name="verify">
+///   <Description>PHPX standard module function `verify` from `jwt`.</Description>
+///   <Parameter name="$token" type="string" required="true" typeLink="/docs/php/types/string">
+///     Parameter $token.
+///   </Parameter>
+///   <Parameter name="$secret" type="mixed" required="true" typeLink="/docs/php/types/mixed">
+///     Parameter $secret.
+///   </Parameter>
+///   <Parameter name="$options" type="mixed" required="false" typeLink="/docs/php/types/mixed">
+///     Parameter $options.
+///   </Parameter>
+///   <ReturnType type="Result<mixed, string>" />
+/// </Function>
 export function verify($token: string, $secret: mixed, $options: mixed = []): Result<mixed, string>
