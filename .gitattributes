@@ -1,0 +1,2 @@
+# Treat PHPX source as PHP for GitHub linguist classification.
+*.phpx linguist-language=PHP
