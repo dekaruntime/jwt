@@ -1,0 +1,33 @@
+name: Release stdlib tarball to R2
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build tarball
+        run: |
+          MODULE="${{ github.event.repository.name }}"
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p /tmp/dist
+          tar -czf "/tmp/dist/${MODULE}-${VERSION}.tgz" --exclude='.git' .
+          echo "MODULE=$MODULE" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "ARCHIVE=/tmp/dist/${MODULE}-${VERSION}.tgz" >> "$GITHUB_ENV"
+
+      - name: Upload to R2
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: r2 object put deka-stdlib/${{ env.MODULE }}/${{ env.VERSION }}/${{ env.MODULE }}-${{ env.VERSION }}.tgz --file ${{ env.ARCHIVE }} --content-type application/gzip
