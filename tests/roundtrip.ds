@@ -1,0 +1,86 @@
+import { sign, verify } from "../index.ds"
+
+fn utf8(value: string): bytes {
+  let encoded = unsafe { new TextEncoder().encode(value) };
+  return match (encoded) {
+    Ok(buf) => buf,
+    Err(err) => utf8("")
+  };
+}
+
+fn go() {
+  let secret = utf8("secret");
+  let payload = { sub: "1234567890", name: "John Doe", iat: 1516239022 };
+  const expected = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.XbPfbIHMI6arZ3Y922BhjWgQzWXcXNrz0ogtVhfEd2o";
+  const signed = match (sign(payload, secret, {})) {
+    Ok(v) => v,
+    Err(e) => "fail-sign"
+  };
+  if (signed != expected) {
+    print("fail-vector");
+    print(signed);
+    return;
+  }
+
+  const verified = match (verify(signed, secret, {})) {
+    Ok(v) => v,
+    Err(e) => "fail-verify"
+  };
+  const sub = match (unsafe { String(verified.sub || "") }) {
+    Ok(v) => v,
+    Err(e) => ""
+  };
+  if (sub != "1234567890") {
+    print("fail-verify");
+    return;
+  }
+
+  const none_tok = "eyJhbGciOiJub25lIn0.eyJzdWIiOiIxIn0.";
+  const none_rejected = match (verify(none_tok, secret, {})) {
+    Ok(v) => false,
+    Err(e) => true
+  };
+  if (!none_rejected) {
+    print("fail-none");
+    return;
+  }
+
+  const tampered = match (unsafe { signed.slice(0, -1) + (signed.slice(-1) === "o" ? "x" : "o") }) {
+    Ok(v) => v,
+    Err(e) => signed
+  };
+  const tamper_rejected = match (verify(tampered, secret, {})) {
+    Ok(v) => false,
+    Err(e) => true
+  };
+  if (!tamper_rejected) {
+    print("fail-tamper");
+    return;
+  }
+
+  const wrong_key = match (verify(signed, utf8("other"), {})) {
+    Ok(v) => false,
+    Err(e) => true
+  };
+  if (!wrong_key) {
+    print("fail-wrong-key");
+    return;
+  }
+
+  const expired = match (sign({ sub: "1", exp: 1 }, secret, {})) {
+    Ok(v) => v,
+    Err(e) => "fail-exp-sign"
+  };
+  const expired_rejected = match (verify(expired, secret, {})) {
+    Ok(v) => false,
+    Err(e) => true
+  };
+  if (!expired_rejected) {
+    print("fail-exp");
+    return;
+  }
+
+  print("ok");
+}
+
+go()
