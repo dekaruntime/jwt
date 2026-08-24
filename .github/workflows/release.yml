@@ -1,16 +1,24 @@
 name: Release stdlib tarball to R2
 
+# Stdlib repos have no self-hosted runners (those are on dekaruntime/deka).
+# tar + wrangler run on GitHub-hosted ubuntu.
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (e.g. 0.2.0)'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
   release:
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,7 +26,11 @@ jobs:
       - name: Build tarball
         run: |
           MODULE="${{ github.event.repository.name }}"
-          VERSION="${GITHUB_REF_NAME#v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
           mkdir -p /tmp/dist
           tar -czf "/tmp/dist/${MODULE}-${VERSION}.tgz" --exclude='.git' .
           echo "MODULE=$MODULE" >> "$GITHUB_ENV"
