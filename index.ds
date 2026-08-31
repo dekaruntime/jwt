@@ -75,7 +75,7 @@ fn header_json(alg: string): string {
   return ""
 }
 
-fn option_alg(options: object): string {
+fn option_alg<T>(options: T): string {
   let r = unsafe { String(options && options.alg ? options.alg : "HS256").toUpperCase() };
   return match (r) {
     Ok(v) => v,
@@ -83,7 +83,7 @@ fn option_alg(options: object): string {
   };
 }
 
-fn claims_json(payload: object, options: object): string {
+fn claims_json<T, U>(payload: T, options: U): string {
   let r = unsafe {
     var claims = Object.assign({}, payload);
     var now = Math.floor(Date.now() / 1000);
@@ -137,7 +137,7 @@ fn parse_claims(payload_b64: string) {
   return unsafe { JSON.parse(json) };
 }
 
-fn validate_claims(claims: object, options: object) {
+fn validate_claims<T, U>(claims: T, options: U) {
   return unsafe {
     var now = Math.floor(Date.now() / 1000);
     var leeway = options && options.leeway != null ? Number(options.leeway) : 0;
@@ -160,7 +160,7 @@ fn validate_claims(claims: object, options: object) {
   };
 }
 
-export fn sign(payload: object, secret: bytes, options: object = {}) {
+export fn sign<T, U>(payload: T, secret: bytes, options: U = {}) {
   const alg = option_alg(options);
   const header = header_json(alg);
   if (header == "") {
@@ -177,7 +177,7 @@ export fn sign(payload: object, secret: bytes, options: object = {}) {
   }
 }
 
-export fn verify(token: string, secret: bytes, options: object = {}) {
+export fn verify<T>(token: string, secret: bytes, options: T = {}) {
   return match (jwt_parts(token)) {
     Err(e) => Err("invalid jwt format"),
     Ok(p) => match (require_hs256(header_alg(p.header))) {
