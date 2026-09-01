@@ -1,7 +1,7 @@
 import { sign, verify } from "../index.ds"
 
 fn utf8(value: string): bytes {
-  let encoded = unsafe { new TextEncoder().encode(value) };
+  let encoded = unsafe<bytes> { new TextEncoder().encode(value) };
   return match (encoded) {
     Ok(buf) => buf,
     Err(err) => utf8("")
@@ -26,7 +26,7 @@ fn go() {
     Ok(v) => v,
     Err(e) => "fail-verify"
   };
-  const sub = match (unsafe { String(verified.sub || "") }) {
+  const sub = match (unsafe<string> { String(verified.sub || "") }) {
     Ok(v) => v,
     Err(e) => ""
   };
