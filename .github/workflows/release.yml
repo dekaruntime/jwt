@@ -22,6 +22,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install deka CLI
+        run: |
+          VERSION="$(curl -sSf https://releases.deka.gg/latest.json | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)"
+          curl -sSfL "https://releases.deka.gg/${VERSION}/deka-darwin-arm64" -o /tmp/deka
+          chmod +x /tmp/deka
+
+      - name: Verify package as an installed consumer
+        run: /tmp/deka check --as-package .
+
       - name: Build tarball
         run: |
           MODULE="${{ github.event.repository.name }}"
