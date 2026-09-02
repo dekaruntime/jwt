@@ -1,6 +1,6 @@
 import { sign, verify } from "../index.ds"
 
-fn utf8(value: string): bytes {
+fn utf8(value: string) bytes {
   let encoded = unsafe<bytes> { new TextEncoder().encode(value) };
   return match (encoded) {
     Ok(buf) => buf,

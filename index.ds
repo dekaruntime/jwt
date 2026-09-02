@@ -1,7 +1,7 @@
 // Compact JWS on @deka/crypto. HS256 only; alg=none is rejected.
 import { hmac, secure_compare } from "crypto"
 
-fn utf8(value: string): bytes {
+fn utf8(value: string) bytes {
   let encoded = unsafe<bytes> { new TextEncoder().encode(value) };
   return match (encoded) {
     Ok(buf) => buf,
@@ -9,7 +9,7 @@ fn utf8(value: string): bytes {
   };
 }
 
-fn from_utf8(value: bytes): string {
+fn from_utf8(value: bytes) string {
   let decoded = unsafe { new TextDecoder("utf-8", { fatal: false }).decode(value) };
   return match (decoded) {
     Ok(text) => text,
@@ -17,7 +17,7 @@ fn from_utf8(value: bytes): string {
   };
 }
 
-fn b64url_encode(data: bytes): string {
+fn b64url_encode(data: bytes) string {
   let r = unsafe {
     var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var s = "";
@@ -41,7 +41,7 @@ fn b64url_encode(data: bytes): string {
   };
 }
 
-fn b64url_decode(value: string): bytes {
+fn b64url_decode(value: string) bytes {
   let r = unsafe {
     var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var s = String(value).replace(/-/g, "+").replace(/_/g, "/");
@@ -68,14 +68,14 @@ fn b64url_decode(value: string): bytes {
   };
 }
 
-fn header_json(alg: string): string {
+fn header_json(alg: string) string {
   if (alg == "HS256") {
     return "{\"alg\":\"HS256\",\"typ\":\"JWT\"}"
   }
   return ""
 }
 
-fn option_alg<T>(options: T): string {
+fn option_alg<T>(options: T) string {
   let r = unsafe<string> { String(options && options.alg ? options.alg : "HS256").toUpperCase() };
   return match (r) {
     Ok(v) => v,
@@ -83,7 +83,7 @@ fn option_alg<T>(options: T): string {
   };
 }
 
-fn claims_json<T, U>(payload: T, options: U): string {
+fn claims_json<T, U>(payload: T, options: U) string {
   let r = unsafe {
     var claims = Object.assign({}, payload);
     var now = Math.floor(Date.now() / 1000);
@@ -109,7 +109,7 @@ fn jwt_parts(token: string) {
   };
 }
 
-fn header_alg(header_b64: string): string {
+fn header_alg(header_b64: string) string {
   const json = from_utf8(b64url_decode(header_b64));
   let r = unsafe<string> { String(JSON.parse(json).alg || "") };
   return match (r) {
