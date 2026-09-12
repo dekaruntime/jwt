@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version without v prefix (e.g. 0.2.0)'
+        description: 'Version without v prefix (e.g. 0.1.0)'
         required: true
         type: string
 
@@ -18,18 +18,22 @@ jobs:
   release:
     # Org self-hosted only. Never ubuntu-latest / GitHub-hosted.
     runs-on: [self-hosted, macOS, ARM64]
+    environment: release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install deka CLI
+      - name: Install deka + dsc CLIs
         run: |
           VERSION="$(curl -sSf https://releases.deka.gg/latest.json | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)"
           curl -sSfL "https://releases.deka.gg/${VERSION}/deka-darwin-arm64" -o /tmp/deka
           chmod +x /tmp/deka
+          # deka check shells out to dsc since the toolchain split; same lockstep version
+          curl -sSfL "https://github.com/dekaruntime/dsc/releases/download/v${VERSION}/dsc-darwin-arm64" -o /tmp/dsc
+          chmod +x /tmp/dsc
 
       - name: Verify package as an installed consumer
-        run: /tmp/deka check --as-package .
+        run: DEKA_DSC=/tmp/dsc /tmp/deka check --as-package .
 
       - name: Build tarball
         run: |
@@ -45,9 +49,31 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "ARCHIVE=/tmp/dist/${MODULE}-${VERSION}.tgz" >> "$GITHUB_ENV"
 
-      - name: Upload to R2
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: r2 object put deka-stdlib/${{ env.MODULE }}/${{ env.VERSION }}/${{ env.MODULE }}-${{ env.VERSION }}.tgz --file ${{ env.ARCHIVE }} --content-type application/gzip
+      - name: Upload to R2 (S3 API)
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3api put-object \
+            --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
+            --bucket deka-stdlib \
+            --key "${MODULE}/${VERSION}/${MODULE}-${VERSION}.tgz" \
+            --body "${ARCHIVE}" \
+            --content-type application/gzip
+
+      - name: Verify by reading the bytes back
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3api get-object \
+            --endpoint-url "${{ secrets.R2_ENDPOINT }}" \
+            --bucket deka-stdlib \
+            --key "${MODULE}/${VERSION}/${MODULE}-${VERSION}.tgz" \
+            /tmp/readback.tgz >/dev/null
+          LOCAL=$(shasum -a 256 "${ARCHIVE}" | awk '{print $1}')
+          REMOTE=$(shasum -a 256 /tmp/readback.tgz | awk '{print $1}')
+          [ "$LOCAL" = "$REMOTE" ] || { echo "::error::R2 read-back hash mismatch"; exit 1; }
+          echo "verified: ${MODULE}-${VERSION}.tgz ${REMOTE}"
