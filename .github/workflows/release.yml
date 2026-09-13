@@ -35,6 +35,9 @@ jobs:
           curl -sSfL "https://github.com/dekaruntime/dsc/releases/download/${DSC_TAG}/dsc-darwin-arm64" -o /tmp/dsc
           chmod +x /tmp/dsc
 
+      - name: Install package dependencies
+        run: DEKA_DSC=/tmp/dsc /tmp/deka install
+
       - name: Verify package
         run: |
           # as-package check refuses registry deps by design (the host owns
