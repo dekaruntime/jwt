@@ -1,8 +1,9 @@
 {
   "name": "@deka/jwt",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "main": "index.ds",
   "dependencies": {
-    "@deka/crypto": "0.3.1"
+    "@deka/crypto": "0.4.0",
+    "@deka/bytes": "0.4.0"
   }
 }

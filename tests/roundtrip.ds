@@ -1,37 +1,45 @@
 import { sign, verify } from "../index.ds"
+import { from_string, to_base64, from_base64 } from "@deka/bytes"
+import { hmac } from "@deka/crypto"
+interface Claims { iat?: number; exp?: number; nbf?: number; iss?: string; aud?: string; sub?: string }
+interface Header { alg?: string }
 
-fn utf8(value: string) bytes {
-  let encoded = unsafe<bytes> { new TextEncoder().encode(value) };
-  return match (encoded) {
-    Ok(buf) => buf,
-    Err(err) => utf8("")
-  };
+summon {
+  parse_header_json(json: string): Exception<Header, JsError>,
+  parse_claims_json(json: string): Exception<Claims, JsError>
+} from "../boundary.mjs"
+summon { total log(value: string): void } from "./log.mjs"
+
+fn unwrap_token(value: Result<string, string>) string { return match (value) { Ok(v) => v, Err(e) => e } }
+fn error_of<T>(value: Result<T, string>) string { return match (value) { Ok(v) => "", Err(e) => e } }
+fn rejects(token: string, secret: bytes) boolean { return match (verify(token, secret)) { Ok(v) => false, Err(e) => true } }
+fn rejects_with_leeway(token: string, secret: bytes) boolean { return match (verify(token, secret, { leeway: Some(9999999999) })) { Ok(v) => false, Err(e) => true } }
+fn url64(value: bytes) string { return to_base64(value).split("+").join("-").split("/").join("_").split("=").join("") }
+fn raw_token(header: string, payload: string, secret: bytes) string {
+  const input = url64(from_string(header)) + "." + url64(from_string(payload))
+  return match (hmac("sha256", secret, from_string(input))) { Ok(sig) => input + "." + url64(sig), Err(e) => e }
 }
 
 fn go() {
-  let secret = utf8("secret");
-  let payload = { sub: "1234567890", name: "John Doe", iat: 1516239022 };
+  let secret = from_string("secret");
+  let payload = { sub: Some("1234567890"), name: "John Doe", iat: Some(1516239022) };
   const expected = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.XbPfbIHMI6arZ3Y922BhjWgQzWXcXNrz0ogtVhfEd2o";
   const signed = match (sign(payload, secret, {})) {
     Ok(v) => v,
     Err(e) => "fail-sign"
   };
   if (signed != expected) {
-    print("fail-vector");
-    print(signed);
+    log("fail-vector");
+    log(signed);
     return;
   }
 
-  const verified = match (verify(signed, secret, {})) {
-    Ok(v) => v,
+  const sub = match (verify(signed, secret)) {
+    Ok(claims) => match (claims.sub) { Some(v) => v, None => "" },
     Err(e) => "fail-verify"
   };
-  const sub = match (unsafe<string> { String(verified.sub || "") }) {
-    Ok(v) => v,
-    Err(e) => ""
-  };
   if (sub != "1234567890") {
-    print("fail-verify");
+    log("fail-verify");
     return;
   }
 
@@ -41,33 +49,30 @@ fn go() {
     Err(e) => true
   };
   if (!none_rejected) {
-    print("fail-none");
+    log("fail-none");
     return;
   }
 
-  const tampered = match (unsafe { signed.slice(0, -1) + (signed.slice(-1) === "o" ? "x" : "o") }) {
-    Ok(v) => v,
-    Err(e) => signed
-  };
+  const tampered = signed.slice(0, signed.length - 2) + "AA";
   const tamper_rejected = match (verify(tampered, secret, {})) {
     Ok(v) => false,
     Err(e) => true
   };
   if (!tamper_rejected) {
-    print("fail-tamper");
+    log("fail-tamper");
     return;
   }
 
-  const wrong_key = match (verify(signed, utf8("other"), {})) {
+  const wrong_key = match (verify(signed, from_string("other"), {})) {
     Ok(v) => false,
     Err(e) => true
   };
   if (!wrong_key) {
-    print("fail-wrong-key");
+    log("fail-wrong-key");
     return;
   }
 
-  const expired = match (sign({ sub: "1", exp: 1 }, secret, {})) {
+  const expired = match (sign({ sub: Some("1"), exp: Some(1) }, secret, {})) {
     Ok(v) => v,
     Err(e) => "fail-exp-sign"
   };
@@ -76,11 +81,34 @@ fn go() {
     Err(e) => true
   };
   if (!expired_rejected) {
-    print("fail-exp");
+    log("fail-exp");
     return;
   }
 
-  print("ok");
+  if (!rejects("bad", secret) || !rejects("a.b.c.d", secret) || !rejects("a.b.c", secret) || !rejects("!!!.e30.AA", secret)) { log("fail-malformed"); return; }
+  if (error_of(verify(raw_token("{", "{}", secret), secret)) != "invalid jwt header") { log("fail-header-json"); return; }
+  if (error_of(verify(raw_token("{\"alg\":\"HS256\"}", "{", secret), secret)) != "invalid jwt payload") { log("fail-payload-json"); return; }
+  if (!rejects(raw_token("null", "{}", secret), secret) || !rejects(raw_token("{\"alg\":\"HS256\"}", "[]", secret), secret)) { log("fail-json-shape"); return; }
+  if (!rejects(raw_token("{\"alg\":\"HS256\"}", "{\"exp\":\"never\"}", secret), secret)) { log("fail-claim-type"); return; }
+  const bad_header = match (parse_header_json("{")) { Ok(v) => false, Throw(e) => true };
+  const bad_claims = match (parse_claims_json("{")) { Ok(v) => false, Throw(e) => true };
+  const bad_base64 = match (from_base64("!")) { Ok(v) => false, Throw(e) => true };
+  if (!bad_header || !bad_claims || !bad_base64) { log("fail-exception"); return; }
+  const sparse = unwrap_token(sign({}, secret));
+  if (rejects(sparse, secret)) { log("fail-empty-claims"); return; }
+  const missing_sub = match (verify(sparse, secret)) { Ok(claims) => match (claims.sub) { Some(v) => false, None => true }, Err(e) => false };
+  if (!missing_sub) { log("fail-omitted-sub"); return; }
+  const future = unwrap_token(sign({ iat: Some(9999999999) }, secret));
+  const inactive = unwrap_token(sign({ nbf: Some(9999999999) }, secret));
+  if (error_of(verify(future, secret)) != "jwt issued in future" || error_of(verify(inactive, secret)) != "jwt not active yet") { log("fail-time-claims"); return; }
+  const overridden = unwrap_token(sign({ sub: Some("before") }, secret, { sub: Some("after"), iss: Some("issuer"), aud: Some("audience"), exp_in: Some(60) }));
+  const override_sub = match (verify(overridden, secret, { iss: Some("issuer"), aud: Some("audience") })) { Ok(claims) => match (claims.sub) { Some(v) => v, None => "" }, Err(e) => e };
+  if (override_sub != "after") { log("fail-options"); return; }
+  if (error_of(verify(overridden, secret, { iss: Some("wrong") })) != "jwt issuer mismatch" || error_of(verify(overridden, secret, { aud: Some("wrong") })) != "jwt audience mismatch") { log("fail-identity"); return; }
+  const explicit_exp = unwrap_token(sign({}, secret, { exp_in: Some(9999999999), exp: Some(1) }));
+  if (error_of(verify(explicit_exp, secret)) != "jwt expired" || rejects_with_leeway(explicit_exp, secret)) { log("fail-exp-precedence-leeway"); return; }
+  if (unwrap_token(sign({}, secret, { alg: Some("none") })) != "unsupported jwt alg") { log("fail-sign-alg"); return; }
+  log("ok");
 }
 
 go()

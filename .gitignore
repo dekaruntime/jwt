@@ -2,3 +2,6 @@
 deka.lock
 ds_modules/
 host-grants.json
+.toolchain/
+deka.grants.json
+.deka.*-backup-*
