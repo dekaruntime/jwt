@@ -35,8 +35,16 @@ jobs:
           curl -sSfL "https://github.com/dekaruntime/dsc/releases/download/${DSC_TAG}/dsc-darwin-arm64" -o /tmp/dsc
           chmod +x /tmp/dsc
 
-      - name: Verify package as an installed consumer
-        run: DEKA_DSC=/tmp/dsc /tmp/deka check --as-package .
+      - name: Verify package
+        run: |
+          # as-package check refuses registry deps by design (the host owns
+          # installs), so dep-having packages verify through their tests as
+          # the consumer instead.
+          if python3 -c "import json,sys; sys.exit(0 if json.load(open('deka.json')).get('dependencies') else 1)"; then
+            for t in tests/*.ds; do DEKA_DSC=/tmp/dsc /tmp/deka check "$t"; done
+          else
+            DEKA_DSC=/tmp/dsc /tmp/deka check --as-package .
+          fi
 
       - name: Build tarball
         run: |
