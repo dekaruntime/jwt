@@ -28,8 +28,11 @@ jobs:
           VERSION="$(curl -sSf https://releases.deka.gg/latest.json | sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1)"
           curl -sSfL "https://releases.deka.gg/${VERSION}/deka-darwin-arm64" -o /tmp/deka
           chmod +x /tmp/deka
-          # deka check shells out to dsc since the toolchain split; same lockstep version
-          curl -sSfL "https://github.com/dekaruntime/dsc/releases/download/v${VERSION}/dsc-darwin-arm64" -o /tmp/dsc
+          # deka check shells out to dsc since the toolchain split. dsc has its
+          # own semver (deka 0.51.0 vs dsc 0.51.2 already diverged), so resolve
+          # dsc from its own latest release, never from deka's version.
+          DSC_TAG="$(curl -sSf https://api.github.com/repos/dekaruntime/dsc/releases/latest | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
+          curl -sSfL "https://github.com/dekaruntime/dsc/releases/download/${DSC_TAG}/dsc-darwin-arm64" -o /tmp/dsc
           chmod +x /tmp/dsc
 
       - name: Verify package as an installed consumer
