@@ -25,11 +25,11 @@ interface JwtHeader { alg?: string }
 interface JwtParts { header: string; payload: string; signature: string; input: string }
 
 summon {
-  parse_header_json(json: string): Exception<JwtHeader, JsError>,
-  parse_claims_json(json: string): Exception<JwtClaims, JsError>,
-  serialize_claims(payload: JwtClaims, iat: number, exp: Option<number>, iss: Option<string>, aud: Option<string>, sub: Option<string>): Exception<string, JsError>,
-  total now_seconds(): number,
-  total valid_b64url(value: string): boolean
+  parse_header_json(json: string) Exception<JwtHeader, JsError>,
+  parse_claims_json(json: string) Exception<JwtClaims, JsError>,
+  serialize_claims(payload: JwtClaims, iat: number, exp: Option<number>, iss: Option<string>, aud: Option<string>, sub: Option<string>) Exception<string, JsError>,
+  total now_seconds() number,
+  total valid_b64url(value: string) boolean
 } from "./boundary.mjs"
 
 fn b64url_encode(data: bytes) string {
