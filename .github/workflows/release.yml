@@ -58,7 +58,11 @@ jobs:
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           mkdir -p /tmp/dist
-          tar -czf "/tmp/dist/${MODULE}-${VERSION}.tgz" --exclude='.git' .
+          # deterministic clean: the install step materializes ds_modules and
+          # deka.json backups; never let them into the artifact (crypto-0.4.0
+          # and jwt/auth-0.4.1 lessons — tar excludes alone drifted per-repo).
+          rm -rf ds_modules php_modules .deka.json-backup-*
+          tar -czf "/tmp/dist/${MODULE}-${VERSION}.tgz" --exclude='.git' --exclude='ds_modules' --exclude='.deka.json-backup-*' --exclude='.github' .
           echo "MODULE=$MODULE" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "ARCHIVE=/tmp/dist/${MODULE}-${VERSION}.tgz" >> "$GITHUB_ENV"
